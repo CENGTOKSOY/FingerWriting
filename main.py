@@ -83,17 +83,4 @@ while True:
                         break
 
 
-    # Çizim ekranını ana görüntüye ekle
-    combined = cv2.add(frame, drawing)
-
-    # Görüntüleri göster
-    cv2.imshow('frame', combined)
-    cv2.imshow('drawing', drawing)
-
-    # 'q' tuşuna basıldığında döngüden çık
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Kamerayı serbest bırak ve pencereleri kapat
-cap.release()
-cv2.destroyAllWindows()
+   
