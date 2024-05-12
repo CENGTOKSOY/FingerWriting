@@ -1,7 +1,22 @@
 import cv2
 import numpy as np
 
+# Kamerayı başlat
+cap = cv2.VideoCapture(0)
 
+# El tanıma için renk aralığını ayarla (HSV formatında)
+lower_skin = np.array([0, 20, 70], dtype=np.uint8)
+upper_skin = np.array([20, 255, 255], dtype=np.uint8)
+
+# Ekrana yazı yazmak için boş bir görüntü oluştur
+ret, test_frame = cap.read()
+if ret:
+    drawing = np.zeros((test_frame.shape[0], test_frame.shape[1], 3), np.uint8)
+else:
+    print("Kamera görüntüsü alınamıyor, lütfen kamera bağlantısını kontrol edin.")
+    cap.release()
+    cv2.destroyAllWindows()
+    exit()
 
 # Yazı yazma durumunu kontrol etmek için bir değişken
 writing = False
