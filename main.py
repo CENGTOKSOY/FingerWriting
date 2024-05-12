@@ -18,6 +18,20 @@ else:
     cv2.destroyAllWindows()
     exit()
 
+# Yazı yazma durumunu kontrol etmek için bir değişken
+writing = False
+last_point = None
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        print("Kamera görüntüsü okunamıyor, döngüden çıkılıyor.")
+        break
+
+    frame = cv2.flip(frame, 1)
+
+    # Renk uzayını BGR'dan HSV'ye dönüştür
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
     # El rengi için maske oluştur
     mask = cv2.inRange(hsv, lower_skin, upper_skin)
