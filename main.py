@@ -93,17 +93,6 @@ while True:
     mask = process_frame(frame)
     largest_contour = find_largest_contour(mask)
 
-    if largest_contour is not None:
-        center = get_contour_center(largest_contour)
-        if center:
-            if writing and last_point:
-                draw_line(drawing, last_point, center, color)
-            last_point = center
-
-            hull = cv2.convexHull(largest_contour, returnPoints=False)
-            defects = cv2.convexityDefects(largest_contour, hull)
-            if defects is not None:
-                toggle_writing(defects, largest_contour)
 
 
     combined = cv2.add(frame, drawing)
