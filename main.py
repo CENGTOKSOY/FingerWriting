@@ -1,3 +1,23 @@
+import cv2
+import numpy as np
+
+def initialize_camera():
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        print("Kamera açılamadı.")
+        exit()
+    return cap
+
+def create_empty_drawing(frame):
+    return np.zeros((frame.shape[0], frame.shape[1], 3), np.uint8)
+
+def process_frame(frame):
+    frame = cv2.flip(frame, 1)
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(hsv, lower_skin, upper_skin)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=2)
+    mask = cv2.dilate(mask, kernel, iterations=1)
+    return mask
 
 def find_largest_contour(mask):
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
