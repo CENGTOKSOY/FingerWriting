@@ -1,26 +1,88 @@
 import cv2
 import numpy as np
 
-# Kamerayı başlat
-cap = cv2.VideoCapture(0)
+def initialize_camera():
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        print("Kamera açılamadı.")
+        exit()
+    return cap
 
-# El tanıma için renk aralığını ayarla (HSV formatında)
+def create_empty_drawing(frame):
+    return np.zeros((frame.shape[0], frame.shape[1], 3), np.uint8)
+
+def process_frame(frame):
+    frame = cv2.flip(frame, 1)
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(hsv, lower_skin, upper_skin)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=2)
+    mask = cv2.dilate(mask, kernel, iterations=1)
+    return mask
+
+def find_largest_contour(mask):
+    contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    if contours:
+        return max(contours, key=cv2.contourArea)
+    return None
+
+def get_contour_center(contour):
+    moments = cv2.moments(contour)
+    if moments['m00'] != 0:
+        return (int(moments['m10'] / moments['m00']), int(moments['m01'] / moments['m00']))
+    return None
+
+def draw_line(drawing, start_point, end_point, color):
+    cv2.line(drawing, start_point, end_point, color, 2)
+
+def toggle_writing(defects, contour):
+    global writing
+    for i in range(defects.shape[0]):
+        s, e, f, d = defects[i, 0]
+        start = tuple(contour[s][0])
+        end = tuple(contour[e][0])
+        far = tuple(contour[f][0])
+        a = np.linalg.norm(np.array(end) - np.array(start))
+        b = np.linalg.norm(np.array(far) - np.array(start))
+        c = np.linalg.norm(np.array(end) - np.array(far))
+        area = 0.5 * b * c * np.sin(np.arccos((b ** 2 + c ** 2 - a ** 2) / (2 * b * c)))
+        if area < 1000:
+            writing = not writing
+            print("Yazı yazma durumu:", "Başla" if writing else "Dur")
+            break
+
+def clear_screen(key, drawing):
+    if key == ord('c'):
+        drawing[:] = 0
+        print("Ekran temizlendi.")
+
+def change_color(key):
+    global color
+    if key == ord('r'):
+        color = (0, 0, 255) # Kırmızı
+    elif key == ord('g'):
+        color = (0, 255, 0) # Yeşil
+    elif key == ord('b'):
+        color = (255, 0, 0) # Mavi
+    print(f"Kalem rengi değiştirildi: {color}")
+
+# HSV'de el rengi aralığı
 lower_skin = np.array([0, 20, 70], dtype=np.uint8)
 upper_skin = np.array([20, 255, 255], dtype=np.uint8)
+kernel = np.ones((3, 3), np.uint8)
 
-# Ekrana yazı yazmak için boş bir görüntü oluştur
-ret, test_frame = cap.read()
-if ret:
-    drawing = np.zeros((test_frame.shape[0], test_frame.shape[1], 3), np.uint8)
-else:
-    print("Kamera görüntüsü alınamıyor, lütfen kamera bağlantısını kontrol edin.")
+writing = False
+last_point = None
+color = (255, 255, 255)  # Beyaz başlangıç rengi
+
+cap = initialize_camera()
+ret, frame = cap.read()
+if not ret:
+    print("Kamera görüntüsü okunamıyor, program sonlandırılıyor.")
     cap.release()
     cv2.destroyAllWindows()
     exit()
 
-# Yazı yazma durumunu kontrol etmek için bir değişken
-writing = False
-last_point = None
+drawing = create_empty_drawing(frame)
 
 while True:
     ret, frame = cap.read()
@@ -28,73 +90,30 @@ while True:
         print("Kamera görüntüsü okunamıyor, döngüden çıkılıyor.")
         break
 
-    frame = cv2.flip(frame, 1)
+    mask = process_frame(frame)
+    largest_contour = find_largest_contour(mask)
 
-    # Renk uzayını BGR'dan HSV'ye dönüştür
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    if largest_contour is not None:
+        center = get_contour_center(largest_contour)
+        if center:
+            if writing and last_point:
+                draw_line(drawing, last_point, center, color)
+            last_point = center
 
-    # El rengi için maske oluştur
-    mask = cv2.inRange(hsv, lower_skin, upper_skin)
-
-    # Gürültüyü azalt ve el sınırlarını belirginleştir
-    mask = cv2.erode(mask, None, iterations=2)
-    mask = cv2.dilate(mask, None, iterations=2)
-
-    # Konturları bul ve en büyüğünü seç
-    contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    if contours:
-        largest_contour = max(contours, key=cv2.contourArea)
-
-        # El merkezini bul
-        moments = cv2.moments(largest_contour)
-        if moments['m00'] != 0:
-            cx = int(moments['m10'] / moments['m00'])
-            cy = int(moments['m01'] / moments['m00'])
-
-            # Eğer yazı yazma modu aktifse ve bir önceki nokta varsa, çizgi çiz
-            if writing and last_point is not None:
-                cv2.line(drawing, last_point, (cx, cy), (255, 255, 255), 2)
-            last_point = (cx, cy)
-
-            # Parmak uçlarını algılamak için konturun dışbükey kabuğunu hesapla
             hull = cv2.convexHull(largest_contour, returnPoints=False)
             defects = cv2.convexityDefects(largest_contour, hull)
-
-            # Başparmak ve işaret parmağının birleşip birleşmediğini kontrol et
-            # ...
             if defects is not None:
-                for i in range(defects.shape[0]):
-                    s, e, f, d = defects[i, 0]
-                    start = tuple(largest_contour[s][0])
-                    end = tuple(largest_contour[e][0])
-                    far = tuple(largest_contour[f][0])
-                    # Üçgen alanını hesapla
-                    a = np.linalg.norm(np.array(end) - np.array(start))
-                    b = np.linalg.norm(np.array(far) - np.array(start))
-                    c = np.linalg.norm(np.array(end) - np.array(far))
-                    area = 0.5 * b * c * np.sin(np.arccos((b ** 2 + c ** 2 - a ** 2) / (2 * b * c)))
-                    # Eğer alan belirli bir eşiğin altındaysa, parmaklar birleşmiş demektir
-                    if area < 1000:
-                        writing = not writing  # Yazı yazma durumunu değiştir
-                        if writing:
-                            print("Yazı yazmaya başla.")
-                        else:
-                            print("Yazı yazmayı durdur.")
-                        break
+                toggle_writing(defects, largest_contour)
 
-
-   
- # Çizim ekranını ana görüntüye ekle
     combined = cv2.add(frame, drawing)
-
-    # Görüntüleri göster
     cv2.imshow('frame', combined)
     cv2.imshow('drawing', drawing)
 
-    # 'q' tuşuna basıldığında döngüden çık
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord('q'):
         break
+    clear_screen(key, drawing)
+    change_color(key)
 
-# Kamerayı serbest bırak ve pencereleri kapat
 cap.release()
 cv2.destroyAllWindows()
