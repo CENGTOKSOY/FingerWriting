@@ -105,15 +105,4 @@ while True:
             if defects is not None:
                 toggle_writing(defects, largest_contour)
 
-    combined = cv2.add(frame, drawing)
-    cv2.imshow('frame', combined)
-    cv2.imshow('drawing', drawing)
 
-    key = cv2.waitKey(1) & 0xFF
-    if key == ord('q'):
-        break
-    clear_screen(key, drawing)
-    change_color(key)
-
-cap.release()
-cv2.destroyAllWindows()
